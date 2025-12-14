@@ -24,10 +24,117 @@ document.addEventListener("DOMContentLoaded", function () {
 
   const inputElements = document.querySelectorAll('.hextra-search-input');
   for (const el of inputElements) {
-    el.addEventListener('focus', init);
+    el.addEventListener('focus', handleSearchFocus);
+    el.addEventListener('blur', handleSearchBlur);
     el.addEventListener('keyup', search);
     el.addEventListener('keydown', handleKeyDown);
     el.addEventListener('input', handleInputChange);
+  }
+
+  // Store reference to cloned search wrapper
+  let clonedSearchWrapper = null;
+
+  // Handle search focus - show backdrop and center search
+  function handleSearchFocus(e) {
+    const wrapper = e.target.closest('.hextra-search-wrapper');
+    const backdrop = document.querySelector('.hextra-search-backdrop');
+
+    if (wrapper && !clonedSearchWrapper) {
+      // Clone the search wrapper
+      clonedSearchWrapper = wrapper.cloneNode(true);
+      clonedSearchWrapper.classList.add('hextra-search-focused');
+
+      // Add the cloned wrapper to the body
+      document.body.appendChild(clonedSearchWrapper);
+
+      // Set up event listeners for the cloned search
+      const clonedInput = clonedSearchWrapper.querySelector('.hextra-search-input');
+      if (clonedInput) {
+        clonedInput.focus();
+        clonedInput.value = e.target.value;
+        clonedInput.addEventListener('blur', handleClonedSearchBlur);
+        clonedInput.addEventListener('keyup', search);
+        clonedInput.addEventListener('keydown', handleKeyDown);
+        clonedInput.addEventListener('input', handleInputChange);
+      }
+
+      // Blur the original input
+      e.target.blur();
+
+      // Dim the original search bar
+      wrapper.classList.add('hextra-search-original-blurred');
+    }
+
+    if (backdrop) {
+      backdrop.classList.add('active');
+    }
+
+    // Call original init function with the cloned input or original
+    const targetEvent = clonedSearchWrapper ?
+      { target: clonedSearchWrapper.querySelector('.hextra-search-input') } : e;
+    init(targetEvent);
+  }
+
+  // Handle cloned search blur - remove clone and restore original
+  function handleClonedSearchBlur(e) {
+    // Delay to allow clicking on results
+    setTimeout(() => {
+      const activeElement = document.activeElement;
+      const resultsElement = clonedSearchWrapper?.querySelector('.hextra-search-results');
+
+      // Only blur if not focused on search results
+      if (!resultsElement?.contains(activeElement)) {
+        removeClonedSearch();
+      }
+    }, 200);
+  }
+
+  // Remove cloned search and restore original
+  function removeClonedSearch() {
+    if (clonedSearchWrapper) {
+      clonedSearchWrapper.remove();
+      clonedSearchWrapper = null;
+    }
+
+    // Restore original search bar
+    const originalWrappers = document.querySelectorAll('.hextra-search-wrapper:not(.hextra-search-focused)');
+    originalWrappers.forEach(wrapper => {
+      wrapper.classList.remove('hextra-search-original-blurred');
+    });
+
+    // Hide backdrop
+    const backdrop = document.querySelector('.hextra-search-backdrop');
+    if (backdrop) {
+      backdrop.classList.remove('active');
+    }
+  }
+
+  // Handle search blur - hide backdrop and restore search position
+  function handleSearchBlur(e) {
+    // This handles the original search bar blur
+    // If cloned search exists, do nothing (user clicked on original while clone is open)
+    if (clonedSearchWrapper) {
+      return;
+    }
+
+    // Delay to allow clicking on results
+    setTimeout(() => {
+      const wrapper = e.target.closest('.hextra-search-wrapper');
+      const backdrop = document.querySelector('.hextra-search-backdrop');
+
+      // Only blur if not focused on search results
+      const activeElement = document.activeElement;
+      const resultsElement = wrapper?.querySelector('.hextra-search-results');
+
+      if (!resultsElement?.contains(activeElement)) {
+        if (wrapper) {
+          wrapper.classList.remove('hextra-search-focused');
+        }
+        if (backdrop) {
+          backdrop.classList.remove('active');
+        }
+      }
+    }, 200);
   }
 
   const shortcutElements = document.querySelectorAll('.hextra-search-wrapper kbd');
@@ -45,8 +152,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Get the search wrapper, input, and results elements.
   function getActiveSearchElement() {
+    // If cloned search exists, use it
+    if (clonedSearchWrapper) {
+      return {
+        wrapper: clonedSearchWrapper,
+        inputElement: clonedSearchWrapper.querySelector('.hextra-search-input'),
+        resultsElement: clonedSearchWrapper.querySelector('.hextra-search-results')
+      };
+    }
+
+    // Otherwise use the original search
     const inputs = Array.from(document.querySelectorAll('.hextra-search-wrapper')).filter(el => el.clientHeight > 0);
-    if (inputs.length === 1) {
+    if (inputs.length >= 1) {
       return {
         wrapper: inputs[0],
         inputElement: inputs[0].querySelector('.hextra-search-input'),
@@ -86,15 +203,35 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Dismiss the search results when clicking outside the search box.
   document.addEventListener('mousedown', function (e) {
-    const { inputElement, resultsElement } = getActiveSearchElement();
+    const { wrapper, inputElement, resultsElement } = getActiveSearchElement();
     if (!inputElement || !resultsElement) return;
+
+    const backdrop = document.querySelector('.hextra-search-backdrop');
+
+    // Close search if clicking on backdrop or outside search
     if (
-      e.target !== inputElement &&
-      e.target !== resultsElement &&
-      !resultsElement.contains(e.target)
+      e.target === backdrop ||
+      (e.target !== inputElement &&
+        e.target !== resultsElement &&
+        !resultsElement.contains(e.target) &&
+        !wrapper?.contains(e.target))
     ) {
       setShortcutElementsOpacity(100);
       hideSearchResults();
+      inputElement.blur();
+
+      // If cloned search exists, remove it
+      if (clonedSearchWrapper) {
+        removeClonedSearch();
+      } else {
+        // Remove focused state from original
+        if (wrapper) {
+          wrapper.classList.remove('hextra-search-focused');
+        }
+        if (backdrop) {
+          backdrop.classList.remove('active');
+        }
+      }
     }
   });
 
@@ -133,11 +270,25 @@ document.addEventListener("DOMContentLoaded", function () {
 
   // Finish the search by hiding the results and clearing the input.
   function finishSearch() {
-    const { inputElement } = getActiveSearchElement();
+    const { wrapper, inputElement } = getActiveSearchElement();
     if (!inputElement) return;
     hideSearchResults();
     inputElement.value = '';
     inputElement.blur();
+
+    // If cloned search exists, remove it
+    if (clonedSearchWrapper) {
+      removeClonedSearch();
+    } else {
+      // Remove focused state from original
+      const backdrop = document.querySelector('.hextra-search-backdrop');
+      if (wrapper) {
+        wrapper.classList.remove('hextra-search-focused');
+      }
+      if (backdrop) {
+        backdrop.classList.remove('active');
+      }
+    }
   }
 
   function hideSearchResults() {

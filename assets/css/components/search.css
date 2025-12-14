@@ -1,4 +1,39 @@
 .hextra-search-wrapper {
+  /* Hover glow effect for search input */
+  .hextra-search-input:hover {
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3);
+  }
+
+  /* Original search bar stays in place but gets dimmed when focused elsewhere */
+  &.hextra-search-original-blurred {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  /* When search is focused, position it centered */
+  &.hextra-search-focused {
+    position: fixed;
+    top: 20vh;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    max-width: 600px;
+    z-index: 100;
+  }
+
+  /* Enhanced glow when focused */
+  &.hextra-search-focused .hextra-search-input {
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5), 0 10px 40px rgba(0, 0, 0, 0.3);
+  }
+
+  /* Make search results match the wrapper width when focused */
+  &.hextra-search-focused .hextra-search-results {
+    width: 100%;
+    max-width: 100%;
+    left: 0;
+    right: 0;
+  }
+
   li {
     @apply hx:mx-2.5 hx:break-words hx:rounded-md hx:contrast-more:border hx:text-gray-800 hx:contrast-more:border-transparent hx:dark:text-gray-300;
     a {
@@ -35,4 +70,21 @@
   .hextra-search-match {
     @apply hx:text-primary-600;
   }
+}
+
+/* Backdrop blur overlay */
+.hextra-search-backdrop {
+  display: none;
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  backdrop-filter: blur(8px);
+  background-color: rgba(0, 0, 0, 0.3);
+  z-index: 99;
+}
+
+.hextra-search-backdrop.active {
+  display: block;
 }
