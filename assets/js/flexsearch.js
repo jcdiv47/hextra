@@ -469,7 +469,22 @@ document.addEventListener("DOMContentLoaded", function () {
     }
     resultsElement.classList.remove('hx:hidden');
 
-    const pageResults = window.pageIndex.search(query, 5, { enrich: true, suggest: true })[0]?.result || [];
+    // Fuzzy search configuration
+    const fuzzyEnabled = '{{- site.Params.search.flexsearch.fuzzy.enabled | default true -}}' === 'true';
+    const fuzzyResolution = parseInt('{{- site.Params.search.flexsearch.fuzzy.resolution | default 3 -}}', 10);
+    const fuzzyDepth = parseInt('{{- site.Params.search.flexsearch.fuzzy.depth | default 2 -}}', 10);
+
+    const searchOptions = {
+      enrich: true,
+      suggest: fuzzyEnabled
+    };
+
+    if (fuzzyEnabled) {
+      searchOptions.resolution = fuzzyResolution;
+      searchOptions.depth = fuzzyDepth;
+    }
+
+    const pageResults = window.pageIndex.search(query, 5, searchOptions)[0]?.result || [];
 
     const results = [];
     const pageTitleMatches = {};
@@ -479,7 +494,8 @@ document.addEventListener("DOMContentLoaded", function () {
       pageTitleMatches[i] = 0;
 
       // Show the top 5 results for each page
-      const sectionResults = window.sectionIndex.search(query, 5, { enrich: true, suggest: true, tag: { 'pageId': `page_${result.id}` } })[0]?.result || [];
+      const sectionSearchOptions = { ...searchOptions, tag: { 'pageId': `page_${result.id}` } };
+      const sectionResults = window.sectionIndex.search(query, 5, sectionSearchOptions)[0]?.result || [];
       let isFirstItemOfPage = true
       const occurred = {}
 
